@@ -2,7 +2,7 @@
 
 namespace EcommerceDotNetPro.Models
 {
-    public class mlLogin
+    public class mLogin
     {
         [Required]
         public string UserName { get; set; }

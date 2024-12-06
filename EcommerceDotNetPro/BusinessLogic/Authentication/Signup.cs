@@ -11,7 +11,7 @@ namespace EcommerceDotNetPro.BusinessLogic.Authentication
 
         public void CreateUser(mSignup request)
         {
-            List<mSignup> params = new List<mSignup>();
+            //List<mSignup> params = new List<mSignup>();
 
            
 
