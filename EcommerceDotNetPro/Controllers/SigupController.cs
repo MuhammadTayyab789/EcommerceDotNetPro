@@ -15,21 +15,23 @@ namespace EcommerceDotNetPro.Controllers
 
         }
 
-        public async Task <ActionResult<mSignup>> CreateUser([FromBody] mSignup model)
+        [HttpPost]
+        [Route("CreateUser")]
+        public async Task <ActionResult<UserData>> CreateUser([FromBody] UserData model)
 
         {
             if(model == null)
             {
                 return BadRequest();
             }
-            mSignup user =  new mSignup();
+            UserData user =  new UserData();
             user.UserName = model.UserName;
             user.Email = model.Email;
             user.Password = model.Password;
             user.Phone = model.Phone;  
 
-            await _dbcontext.signup.AddAsync(user);
-            await _dbcontext.SaveChangesAsync();
+            //await _dbcontext.signup.AddAsync(user);
+            //await _dbcontext.SaveChangesAsync();
 
 
             return Ok(user);
