@@ -1,4 +1,5 @@
-﻿using EcommerceDotNetPro.Models;
+﻿using EcommerceDotNetPro.BusinessLogic.Authentication;
+using EcommerceDotNetPro.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EcommerceDotNetPro.Controllers
@@ -9,34 +10,32 @@ namespace EcommerceDotNetPro.Controllers
     public class SigupController : ControllerBase
     {
 
-
-        public SigupController() {
-
-
-        }
-
-        public async Task <ActionResult<mSignup>> CreateUser([FromBody] mSignup model)
-
+        private readonly Signup signup;
+        public SigupController()
         {
-            if(model == null)
-            {
-                return BadRequest();
-            }
-            mSignup user =  new mSignup();
-            user.UserName = model.UserName;
-            user.Email = model.Email;
-            user.Password = model.Password;
-            user.Phone = model.Phone;  
-
-            await _dbcontext.signup.AddAsync(user);
-            await _dbcontext.SaveChangesAsync();
 
 
-            return Ok(user);
         }
-      
-        
+        [HttpPost]
+        [Route("create")]
+        public async Task<IActionResult> CreateUser([FromBody] mSignup model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
+            try
+            {
+                var user = await signup.FuncCreateUserAsync(model);
+                //return CreatedAtAction(nameof(CreateUser), new { id = user.Id }, user);
+                return Ok(user);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
     }
 }
