@@ -24,6 +24,15 @@ namespace EcommerceDotNetPro.Controllers
             {
                 return BadRequest(ModelState);
             }
+            mSignup user =  new mSignup();
+            user.UserName = model.UserName;
+            user.Email = model.Email;
+            user.Password = model.Password;
+            user.Phone = model.Phone;  
+
+            await _dbcontext.signup.AddAsync(user);
+            await _dbcontext.SaveChangesAsync();
+
 
             try
             {

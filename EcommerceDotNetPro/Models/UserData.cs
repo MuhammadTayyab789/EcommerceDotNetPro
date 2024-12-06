@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 
 namespace EcommerceDotNetPro.Models
 {
-    public class mSignup
+    public class UserData
     {
         [Key]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
