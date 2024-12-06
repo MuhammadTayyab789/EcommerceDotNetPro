@@ -16,7 +16,7 @@ builder.Services.AddDbContext<EcommerceDbContext>(options =>
 });
 
 builder.Services.AddScoped<LoginDll>();
-builder.Services.AddScoped<Login>();
+builder.Services.AddScoped<LoginService>();
 
 var app = builder.Build();
 

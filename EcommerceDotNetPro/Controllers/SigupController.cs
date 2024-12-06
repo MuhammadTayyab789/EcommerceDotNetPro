@@ -17,14 +17,14 @@ namespace EcommerceDotNetPro.Controllers
 
         [HttpPost]
         [Route("CreateUser")]
-        public async Task <ActionResult<mSignup>> CreateUser([FromBody] mSignup model)
+        public async Task <ActionResult<UserData>> CreateUser([FromBody] UserData model)
 
         {
             if(model == null)
             {
                 return BadRequest();
             }
-            mSignup user =  new mSignup();
+            UserData user =  new UserData();
             user.UserName = model.UserName;
             user.Email = model.Email;
             user.Password = model.Password;

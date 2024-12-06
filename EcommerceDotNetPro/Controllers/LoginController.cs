@@ -9,30 +9,36 @@ namespace EcommerceDotNetPro.Controllers
     [Route("api/[controller]")]
     public class LoginController : ControllerBase
     {
-        private readonly Login _login;
-        public LoginController(Login login)
+        private readonly LoginService _login;
+        public LoginController(LoginService login)
         {
             _login = login; 
         }
 
         [HttpPost]
         [Route("GetUser")]
-        public async Task<ActionResult<mLogin>> LoginUser([FromBody] mLogin model)
+        public async Task<ActionResult<ResponseLogin>> LoginUser([FromBody] RequestLogin requestModel)
         {
-            if (model == null)
+            if (requestModel == null)
             {
                 return BadRequest();
             }
 
             try
             {
-                var user = await _login.FuncLoginUser(model);
+                var user = await _login.FuncLoginUser(requestModel);
                 if (user == null)
                 {
                     return NotFound("Invalid username or password. Please try again.");
                 }
 
-                return Ok(user);
+                var response = new ResponseLogin
+                {
+                    UserName = requestModel.UserName,
+                    Status = "Login successful"
+                };
+
+                return Ok(response);
             }
             catch (ArgumentException ex)
             {

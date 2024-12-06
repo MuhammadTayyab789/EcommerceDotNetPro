@@ -18,7 +18,7 @@ namespace EcommerceDotNetPro.DataLayer
         public LoginDll()
         {
         }
-        public async Task<bool> AuthenticateUserAsync(mLogin user)
+        public async Task<bool> AuthenticateUserAsync(RequestLogin user)
         {
 
             // Validate input
