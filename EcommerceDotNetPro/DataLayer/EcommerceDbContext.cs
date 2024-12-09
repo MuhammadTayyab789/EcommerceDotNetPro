@@ -10,6 +10,9 @@ namespace EcommerceDotNetPro.DataLayer
 
         public DbSet<UserData> User { get; set; }
 
+        public DbSet<RequestSignup> Customer { get; set; }
+
 
     }
 }
+        

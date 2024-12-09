@@ -17,7 +17,8 @@ builder.Services.AddDbContext<EcommerceDbContext>(options =>
 
 builder.Services.AddScoped<LoginDll>();
 builder.Services.AddScoped<LoginService>();
-
+builder.Services.AddScoped<SignupService>();
+builder.Services.AddScoped<Signupdll>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
