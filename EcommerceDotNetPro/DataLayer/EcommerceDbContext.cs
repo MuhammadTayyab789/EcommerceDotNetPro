@@ -8,8 +8,11 @@ namespace EcommerceDotNetPro.DataLayer
     {
         public EcommerceDbContext(DbContextOptions<EcommerceDbContext> options) : base(options) { }
 
-        public DbSet<UserData> User { get; set; }
+       // public DbSet<RequestSignup> Customer { get; set; }
+
+        public DbSet<RequestSignup> Customer { get; set; }
 
 
     }
 }
+        
