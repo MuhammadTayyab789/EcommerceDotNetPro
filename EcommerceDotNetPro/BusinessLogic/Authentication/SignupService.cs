@@ -1,7 +1,7 @@
 ﻿using EcommerceDotNetPro.DataLayer;
 using EcommerceDotNetPro.Models;
 using System.Reflection;
-
+using Microsoft.AspNetCore.Identity;
 namespace EcommerceDotNetPro.BusinessLogic.Authentication
 {
     public class SignupService
@@ -12,6 +12,12 @@ namespace EcommerceDotNetPro.BusinessLogic.Authentication
             _signupdll = signupdll;
         }
         public async Task<RequestSignup> FuncCreateUser(RequestSignup model) {
+
+
+            var passwordHasher = new PasswordHasher<object>();
+
+            string password = model.Password;
+            string hashedPassword = passwordHasher.HashPassword(null, password);
             if (model == null)
             {
                 throw new ArgumentNullException(nameof(model), "Model cannot be null.");
@@ -22,7 +28,7 @@ namespace EcommerceDotNetPro.BusinessLogic.Authentication
             {
                 UserName = model.UserName,
                 Email = model.Email,
-                Password = model.Password,
+                Password = hashedPassword,
                 Phone = model.Phone
             };
 

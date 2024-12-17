@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using System.Reflection.PortableExecutable;
 using System.Runtime.Intrinsics.X86;
+using Microsoft.AspNetCore.Identity;
 
 namespace EcommerceDotNetPro.DataLayer
 {
@@ -20,18 +21,29 @@ namespace EcommerceDotNetPro.DataLayer
         }
         public async Task<bool> AuthenticateUserAsync(RequestLogin user)
         {
-
+           
             // Validate input
             if (user == null || string.IsNullOrEmpty(user.UserName) || string.IsNullOrEmpty(user.Password))
                 return false;
+            var existingUsers = await _dbcontext.Customer.Where(u => u.UserName == user.UserName).ToListAsync(); 
+               foreach (var existu in existingUsers)
+            {
+                var passwordHasher = new PasswordHasher<object>();
+                var result = passwordHasher.VerifyHashedPassword(null, existu.Password, user.Password);
+                if (result == PasswordVerificationResult.Success)
+                {
+                    return true; // Authentication successful
+                }
 
-            // Use LINQ to query the database for matching user
-            var isUserAuthenticated = await _dbcontext.User
-            .AnyAsync(u => u.UserName == user.UserName && u.Password == user.Password);
+            }
 
-            return isUserAuthenticated;
 
-         
+
+            return false;
+           
+
+
+
         }
     }
 }
