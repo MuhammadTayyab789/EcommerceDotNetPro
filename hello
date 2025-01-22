@@ -1,0 +1,70 @@
+SELECT 
+    @IsSalaried = (CASE WHEN ku.CRP_Type = 4 THEN 'Salaried' ELSE 'Housewives' END), 
+    @FundProviderName = ISNULL(FUNDS_PROV_NAME, ''), 
+    @IsRetryAllowedForKyc = CASE WHEN (ISNULL(ku.RetryCount, 0) < 3) THEN '1' ELSE '0' END
+FROM dbo.KycUpdate ku WITH (NOLOCK) 
+WHERE CustomerID_Number = @CNIC 
+  AND ISNULL(IsKycUpdated, 0) = 0 
+  AND DATEDIFF(DAY, ISNULL(ku.ModifiedAt, DATEADD(DAY, -5, GETDATE())), GETDATE()) > 3;
+login1
+RetryCount	IsKycUpdated	ModifiedAt
+null              null            null                kycviaalfa =1 , popup shown
+1                   0              today              kycvialafa =0 , popup not shown
+2                   0              3 days after        kycviaalfa =1 , popup shown
+3                  0                3 days after         kycviaalfa = 1 , popup not shown
+
+update run 1 time 
+
+
+RetryCount	IsKycUpdated	ModifiedAt
+1              null            today             diff   kycviaalfa =0 , popup  not shown
+
+login same day
+retryCount	IsKycUpdated	ModifiedAt
+1              null            today               kycviaalfa =0 , popup  not shown
+
+
+
+RetryCount	IsKycUpdated	ModifiedAt
+1            0                 2nd day             kycviaalfa =0 , popup  not shown with remind
+RetryCount	IsKycUpdated	ModifiedAt
+1            0                 3 day             kycviaalfa =0 , popup  not shown with remind
+---2nd day and 3rd day no popup
+
+ for 4th day
+1st login
+RetryCount	IsKycUpdated	ModifiedAt
+2             0                 4thday  date      diff 4       kycviaalfa =1 , popup shown with remind
+2nd or number of n log1n same day
+retryCount	IsKycUpdated	ModifiedAt
+2              null            today             diff 0  kycviaalfa =0 , popup  not shown
+
+---2nd day and 3rd day no popup because    diff  1 , 2, 3  
+
+8th day 
+RetryCount	IsKycUpdated	ModifiedAt
+3             0                 8thday  date      diff 4       kycviaalfa =1 , popup shown  without remind force
+2nd or number of n log1n same day
+retryCount	IsKycUpdated	ModifiedAt
+3              1            today             diff 0  kycviaalfa =0 , popup  not shown
+
+UPDATE dbo.KycUpdate 
+SET 
+    RetryCount = CASE 
+                   WHEN DATEDIFF(DAY, ModifiedAt, GETDATE()) > 3 THEN ISNULL(RetryCount, 0) + 1
+                   ELSE RetryCount 
+                 END,
+    ModifiedAt = CASE 
+                   WHEN DATEDIFF(DAY, ModifiedAt, GETDATE()) > 3 THEN GETDATE()
+                   ELSE ModifiedAt 
+                 END
+WHERE 
+    CustomerID_Number = @CNIC 
+    AND ISNULL(IsKycUpdated, 0) = 0;
+
+
+
+
+
+
+
