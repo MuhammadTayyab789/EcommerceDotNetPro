@@ -1,0 +1,686 @@
+using AlfaService.RequestResponse;
+using DataServices.App_Code;
+using DataServices.Common;
+using DataServices.DataLayer;
+using DataServices.DataLayer.DigitalGentrRequestResponse;
+using DataServices.DataLayer.StoredProcedureRequestResponse;
+using DataServices.Security;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using DataServices.BusinessLogic.Rapid;
+
+namespace DataServices.BusinessLogic.zap
+{
+    public class Register
+    {
+        private LoggerAPI _logger = new();
+        private List<string> logstr = new List<string>();
+        private RequestLogger reqlog = new();
+        public ExchangeResponse<cRequestAlfaRegistrationViaRapid> returnresponse = null;
+        private DigitalGentrServices digitalGentrServices = new();
+        private ServiceFunctions _ServiceFunctions;
+
+        public Register(RequestData request)
+        {
+            returnresponse = new ExchangeResponse<cRequestAlfaRegistrationViaRapid>();
+            reqlog.FunctionName = "AlfaRegistrationViaRapid";
+            cDecription<cRequestAlfaRegistrationViaRapid> exchangeSession = new();
+
+            try
+            {
+                returnresponse = exchangeSession.ExchangeSession(request.requestAlfaReg, request.requestAlfaReg.SessionID, request.IMEI, "", "", "", request.Hash);
+                request.requestAlfaReg = returnresponse.Data;
+            }
+            catch (Exception ex)
+            {
+                reqlog.LogType = AlfaService.Configuration.cEnum.LogType.Error;
+                returnresponse.ResponseCode = "01";
+                returnresponse.ResponseDesc = AppResponseCodes.AppErrorCodes[returnresponse.ResponseCode].ToString();
+
+                logstr.Add("Exception while Exchanging Session with AlfaRegistrationViaRapid " + ex);
+            }
+        }
+
+        public cResponseData FuncAlfaRegistrationViaRapid(RequestData requestData)
+        {
+            reqlog.FunctionName = "AlfaRegistrationViaRapid";
+
+            AlfaRegHelper alfaRegHelper = new();
+            List<RapidAccountOpeningDetailsWithoutDocuments> rapidCustomers = new();
+            PersonalDetails personalDetails = new();
+            BankingDetails bankingDetails = new();
+
+            cResponseData response = new()
+            {
+                responseAlfaReg = new cResponseAlfaRegistrationViaRapid(),
+            };
+
+            cEncription<cResponseAlfaRegistrationViaRapid> encryption = new();
+            try
+            {
+                if (returnresponse.ResponseCode.Equals("00"))
+                {
+                    reqlog.FunctionName = " AlfaRegistrationViaRapid | CNIC : " + requestData.requestAlfaReg.CNIC;
+                   
+                    logstr.Add(" request " + JsonConvert.SerializeObject(requestData.requestAlfaReg));
+
+
+                    if (!string.IsNullOrEmpty(requestData.requestAlfaReg.CNIC) && !string.IsNullOrEmpty(requestData.requestAlfaReg.LoginName) && !string.IsNullOrEmpty(requestData.requestAlfaReg.PIN) &&
+                        !string.IsNullOrEmpty(requestData.requestAlfaReg.MobileNo) && !string.IsNullOrEmpty(requestData.requestAlfaReg.Password) && !string.IsNullOrEmpty(requestData.requestAlfaReg.AccountNumber))
+                    {
+                        rapidCustomers = alfaRegHelper.GetCustomerData(requestData.requestAlfaReg.CNIC, requestData.IMEI, ref logstr);
+                        logstr.Add(" RapidData :" + JsonConvert.SerializeObject(rapidCustomers));
+
+                        if (rapidCustomers != null && rapidCustomers.Count > 0)
+                        {
+
+                            personalDetails = JsonConvert.DeserializeObject<PersonalDetails>(rapidCustomers[0].PersonalDetails);
+                            bankingDetails = JsonConvert.DeserializeObject<BankingDetails>(rapidCustomers[0].BankingDetails);
+
+                            bool IsCustomerExist = alfaRegHelper.IsCustomerExists(requestData.requestAlfaReg.CNIC, requestData.requestAlfaReg.LoginName, ref logstr);
+
+                            bool IsAccountExist = alfaRegHelper.IsAccountExists(requestData.requestAlfaReg.CNIC, requestData.requestAlfaReg.LoginName, ref logstr);
+
+                            bool IsUserNameExist = alfaRegHelper.IsUserNameExists(requestData.requestAlfaReg.LoginName, ref logstr);
+
+
+                            if (rapidCustomers[0].IsBioVerified.Equals('0'))
+                            {
+
+                                response.ResponseCode = "950";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+                            }
+
+                            if (IsCustomerExist)
+                            {
+                                response.ResponseCode = "951";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+
+                            }
+                            if (IsAccountExist)
+                            {
+                                response.ResponseCode = "952";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+                            }
+                            if (IsUserNameExist)
+                            {
+                                response.ResponseCode = "956";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+                            }
+
+
+
+
+                            string MobileNumber = alfaRegHelper.FormatMobileNumber(requestData.requestAlfaReg.MobileNo, ref logstr);
+                            logstr.Add("MobileNumber: " + MobileNumber);
+
+                            string PIN = alfaRegHelper.EncryptPIN(requestData.requestAlfaReg.PIN, ref logstr);
+
+                            logstr.Add("PIN: " + PIN);
+
+  
+
+                            if (!string.IsNullOrEmpty(PIN))
+                            {
+                                response.ResponseCode = "953";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+                            }
+                           
+
+                            string Password = alfaRegHelper.EncryptPassword(requestData.requestAlfaReg.Password, ref logstr);
+
+                            logstr.Add("Password: " + Password);
+
+                            if (string.IsNullOrEmpty(requestData.requestAlfaReg.CategoryName))
+                            {
+
+                                alfaRegHelper.InsertUser(requestData.requestAlfaReg.CNIC, requestData.requestAlfaReg.MobileNo, requestData.requestAlfaReg.MobileNo, requestData.requestAlfaReg.AccountNumber, PIN, Password, ref logstr);
+
+                                response.ResponseCode = "00";
+                                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+
+                            }
+
+
+
+
+                            
+                            
+
+                                if (!string.IsNullOrEmpty(MobileNumber) && (!string.IsNullOrEmpty(PIN)) && (!string.IsNullOrEmpty(Password)))
+                                {
+
+                                    bool result = alfaRegHelper.CreateAlfaUser(alfaRegHelper.PrepareRegistrationRequest(requestData.requestAlfaReg.CNIC, MobileNumber, MobileNumber, rapidCustomers[0].Email,
+                                                        Password, requestData.requestAlfaReg.LoginName, requestData.requestAlfaReg.AccountNumber,
+                                                         "", "", (int)General.UserStatus.InActive, "", 5, personalDetails.DateOfBirth.ToString(), _ServiceFunctions.GetMVisaPan(),
+                                                         personalDetails.Name, "0", returnresponse.DeviceID, returnresponse.Device_OS, returnresponse.AppVersion, _ServiceFunctions.GetIPAddress(),
+                                   "Digital Bio", "", "", "Alfa", "", ref logstr, ref reqlog), ref logstr, ref reqlog);
+
+
+                                }
+
+
+
+                            
+                            catch (Exception ex)
+                            {
+
+                                logstr.Add("Exception while creating user " + ex);
+
+
+                            }
+
+                        }
+                        else
+                        {
+
+                            logstr.Add("User Data not exist");
+                            response.ResponseCode = "534";        
+                            response.ResponseDesc = AppResponseCodes.AppErrorCodes["534"].ToString();
+
+                        }
+                    }
+                    else
+                    {
+
+                        response.ResponseCode = "10";
+                        response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+
+                    }
+
+
+                }
+                else
+                {
+                    logstr.Add("Return response  : " + returnresponse.ResponseCode);
+                    response.ResponseCode = returnresponse.ResponseCode;
+                    response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+                }
+            }
+            catch (Exception ex)
+            {
+                reqlog.LogType = AlfaService.Configuration.cEnum.LogType.Error;
+                logstr.Add(" AlfaRegistrationViaRapid Exception : " + ex);
+                response.ResponseCode = "555";
+                response.ResponseDesc = AppResponseCodes.AppErrorCodes[response.ResponseCode].ToString();
+
+            }
+            finally
+            {
+                SQMService sQMService = new();
+                #region :: Encrypting Details
+                response.responseAlfaReg.SessionID = returnresponse.SessionID;
+                ServiceFunctions _ServiceFunctions = new();
+                response.responseAlfaReg.AppURL = _ServiceFunctions.GetSQMUrl(sQMService, requestData.IMEI, returnresponse.LoginName, reqlog.FunctionName, returnresponse.SessionID, returnresponse.OldSessionID, ref logstr);
+                response.responseAlfaReg.AppVersion = returnresponse.AppVersion;
+                response.responseAlfaReg = encryption.FuncEncripto(response.responseAlfaReg, returnresponse.OldSessionID);
+                #endregion
+                reqlog.logger = logstr;
+                _logger.infos(reqlog);
+            }
+            return response;
+        }
+
+
+
+
+
+
+    }
+}
+
+using AlfaService.RequestResponse;
+using DataServices.App_Code;
+using DataServices.Common;
+using DataServices.DataLayer.DigitalGentrRequestResponse;
+using DataServices.DataLayer.StoredProcedureRequestResponse;
+using DataServices.DataLayer;
+using DataServices.Security;
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Data;
+
+namespace DataServices.BusinessLogic.Rapid
+{
+    public class AlfaRegHelper
+    {
+        private IBDatabaseService.Service1Client IBServiceRef = new IBDatabaseService.Service1Client();
+        private DigitalGentrServices digitalGentrServices = new DigitalGentrServices();
+        private ServiceFunctions _ServiceFunctions;
+        private cEncription encryption = new cEncription();
+        private CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+
+        public bool IsCustomerExists(string LoginName, string CNIC, ref List<string> logstr)
+        {
+            bool flg = false;
+
+            CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+            List<string> param = new List<string>();
+            param.Add(LoginName);
+            param.Add(CNIC);
+            DataTable dt = cExecute.GetProcedureData("SP_IsCustomerExist", CML.DataLayer.CEnum.ConnectTo.Ibanking, param);
+            if (dt.Rows.Count > 0)
+            {
+                flg = true;
+            }
+            logstr.Add("IScustomerExist:" + JsonConvert.SerializeObject(dt));
+
+            return flg;
+        }
+
+
+        public bool IsAccountExists(string LoginName, string CNIC, ref List<string> logstr)
+        {
+            bool flg = false;
+
+            CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+            List<string> param = new List<string>();
+            param.Add(LoginName);
+            param.Add(CNIC);
+            DataTable dt = cExecute.GetProcedureData("SP_IsAccountExist", CML.DataLayer.CEnum.ConnectTo.Ibanking, param);
+            if (dt.Rows.Count > 0)
+            {
+                flg = true;
+            }
+            logstr.Add("ISAccountExist:" + JsonConvert.SerializeObject(dt));
+            return flg;
+        }
+
+        public bool IsUserNameExists(string LoginName, ref List<string> logstr)
+        {
+
+            try
+            {
+                IBDatabaseService.SP_IsUserAvailableResult UserAvailableResult = IBServiceRef.IsUserAvailable(LoginName);
+
+                logstr.Add("IScustomerExist:" + UserAvailableResult.RecCount);
+
+                if (UserAvailableResult.RecCount > 0)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            catch (Exception)
+            {
+                logstr.Add(" Exception while IsUserNameExists ");
+            }
+
+            return true;
+        }
+
+        public string FormatMobileNumber(string number, ref List<string> logstr)
+        {
+
+
+            if (number.StartsWith("+92"))
+            {
+                return number;
+            }
+            if (number.StartsWith("92"))
+            {
+                return "+" + number;
+            }
+            else if (number.StartsWith("0"))
+            {
+
+                return "+92" + number.Substring(1);
+            }
+
+            else
+            {
+                return number;
+            }
+
+
+        }
+        public List<RapidAccountOpeningDetailsWithoutDocuments> GetCustomerData(string CNIC, string imei, ref List<string> logstr)
+        {
+            try
+            {
+                GetRapidAccountOpeningDataByCNIC rapidDataRequest = new()
+                {
+                    CNIC = CNIC,
+                    DeviceImei = imei
+                };
+                ExecuteProcedureRequest<object> executeProcedureRequest = new()
+                {
+                    DatabaseName = CML.DataLayer.CEnum.ConnectTo.Ibanking,
+                    ProcedureName = "SP_GetRapidAccountDetailsWithoutDocuments",
+                    ProcedureData = rapidDataRequest
+                };
+                return digitalGentrServices.GetData<RapidAccountOpeningDetailsWithoutDocuments>(executeProcedureRequest);
+            }
+            catch (Exception ex)
+            {
+
+                logstr.Add(" GetCustomerData Exception : " + ex);
+            }
+            return null;
+        }
+
+        public bool Func_InsertPhoneTagging(string IMEI, string PIN, string LoginName, string Title, ref List<string> logstr)
+        {
+            bool result = false;
+            try
+            {
+                CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+                List<string> queryParams = [IMEI, PIN, LoginName, Title];
+
+                logstr.Add("SP Params = " + JsonConvert.SerializeObject(queryParams));
+
+                result = cExecute.CRUDProcedure("Sp_InsertPhoneTaggingCore", CML.DataLayer.CEnum.ConnectTo.Ibanking, queryParams);
+
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                logstr.Add("Exception while Func_InsertPhoneTagging" + ex);
+                return false;
+            }
+        }
+
+        public string ValidateAndEncryptPin(string PIN, ref List<string> logstr)
+        {
+            string encrytpPIN = string.Empty;
+
+            bool chkConsecutive = _ServiceFunctions.HasConsecutiveChars(PIN, 4);
+            bool chkSequence = _ServiceFunctions.IsSequential(PIN);
+
+            logstr.Add("PIN :" + PIN);
+            try
+            {
+                if (chkConsecutive)
+                {
+                    logstr.Add("chkConsecutive" + chkConsecutive);
+                    return string.Empty;
+
+                }
+                if (chkSequence)
+                {
+                    logstr.Add("chkSequence " + chkSequence);
+                    return string.Empty;
+
+                }
+                else
+                {
+
+                    encrytpPIN = encryption.FuncEncryption(PIN.Trim(), cConfig.E_D_Pass);
+
+                    logstr.Add(" encrypt pin " + encrytpPIN);
+                    return encrytpPIN;
+
+                }
+
+            }
+            catch (Exception ex)
+
+            {
+                logstr.Add("Exception in ValidateAndEncryptPin " + ex);
+            }
+            return encrytpPIN;
+
+
+        }
+
+
+        
+
+        public string EncryptPIN(string PIN, ref List<string> logstr)
+        {
+
+            string encryptPIN = encryption.FuncEncryption(PIN, cConfig.E_D_Pass.ToString());
+
+            logstr.Add(" encrypt pin " + encryptPIN);
+            return encryptPIN;
+
+
+        }
+        public string EncryptPassword(string Password, ref List<string> logstr)
+        {
+            string encryptPass = encryption.FuncEncryption(Password.Trim(), cConfig.E_D_Pass);
+            return encryptPass;
+
+
+        }
+
+
+
+        public bool InsertUser(string Cnic, string MobileNo, string LoginName ,string AccountNo,string Pin, string Password ,ref List<string> logstr, ref RequestLogger reqlog)
+        {
+            logstr.Add(" Insert User: " +Cnic);
+            bool result;
+            try
+            {
+                CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+                List<string> param = new List<string>();
+                param.Add(Cnic);
+                param.Add(MobileNo);
+                param.Add(LoginName);
+                param.Add(AccountNo);
+                param.Add(Pin);
+                param.Add(Password);
+
+
+                logstr.Add("Insert User Data: " + JsonConvert.SerializeObject(param));
+
+                result = cExecute.CRUDProcedure("Sp_InsertUser", CML.DataLayer.CEnum.ConnectTo.Ibanking, param);
+
+                logstr.Add("Sp_InsertUser: " + result);
+
+
+            }
+            catch (Exception ex)
+            {
+                reqlog.LogType = AlfaService.Configuration.cEnum.LogType.Error;
+                logstr.Add(" Sp_InsertUser | Exception | " + ex.ToString());
+                return false;
+
+
+            }
+            return result;
+
+        }
+
+
+
+        public bool CreateAlfaUser(RegistrationAlfaRequest request, ref List<string> logstr, ref RequestLogger reqlog)
+        {
+            logstr.Add(" CreateUser IN CNIC: " + request.CNIC);
+            bool result;
+            try
+            {
+                CML.DataLayer.CExecuteQuery cExecute = new CML.DataLayer.CExecuteQuery();
+                List<string> param = new List<string>();
+                param.Add(request.CNIC);
+                param.Add(request.MobileNo);
+                param.Add(request.MNP);
+                param.Add(request.Email);
+                param.Add("0");
+                param.Add(request.Password);
+                param.Add("1");
+                param.Add(request.LoginName);
+                param.Add(request.Card);
+                param.Add(request.SecurityQ);
+                param.Add(request.SecurityA);
+                param.Add(request.UserStatus.ToString());
+                param.Add(request.CustomerType.ToString());
+                param.Add(request.CreditCard);
+                param.Add(request.BirthDate);
+                param.Add(request.VisaPan);
+                param.Add(request.CustomerTitle);
+                param.Add(request.IsSpaisa);
+                param.Add(request.DeviceID);
+                param.Add(request.DeviceOS);
+                param.Add(request.AppVersion);
+                param.Add(request.ServerIP);
+                param.Add(request.RegistrationType);
+                param.Add(request.IsPremier);
+                param.Add(request.IsInfinite);
+                param.Add(request.Source);
+                param.Add(request.IsPassport); //IsPassport
+
+
+                logstr.Add("User Create Data: " + JsonConvert.SerializeObject(param));
+
+                result = cExecute.CRUDProcedure("Sp_CreateUserAppCore", CML.DataLayer.CEnum.ConnectTo.Ibanking, param);
+
+                logstr.Add("Sp_CreateUserAppCore: " + result);
+
+
+            }
+            catch (Exception ex)
+            {
+                reqlog.LogType = AlfaService.Configuration.cEnum.LogType.Error;
+                logstr.Add(" CreateUser | Exception | " + ex.ToString());
+                return false;
+
+
+            }
+            return result;
+
+        }
+
+        public RegistrationAlfaRequest PrepareRegistrationRequest(string CNIC, string MobileNo, string MNP, string Email, string LoginPassword, string LoginName, string DebitCard,
+           string SecurityQ, string SecurityA, int UserStatus, string CreditCard, int CustomerType, string DOB, string MvisaPan, string CustomerName,
+           string isSpaisa, string DeviceID, string DeviceOS, string AppVersion, string ServerIP,
+           string RegistrationType, string IsPremier, string IsInfinite, string Source, string IsPassport, ref List<string> logstr, ref RequestLogger reqlog)
+        {
+            try
+            {
+                RegistrationAlfaRequest request = new RegistrationAlfaRequest()
+                {
+                    CNIC = CNIC,
+                    MobileNo = MobileNo,
+                    MNP = MNP,
+                    Email = Email,
+                    Password = LoginPassword,
+                    LoginName = LoginName,
+                    Card = DebitCard,
+                    SecurityQ = SecurityQ,
+                    SecurityA = SecurityA,
+                    UserStatus = UserStatus,
+                    CreditCard = CreditCard,
+                    CustomerType = CustomerType,
+                    CustomerTitle = CustomerName,
+                    IsSpaisa = isSpaisa,
+                    DeviceID = DeviceID,
+                    DeviceOS = DeviceOS,
+                    AppVersion = AppVersion,
+                    ServerIP = ServerIP,
+                    RegistrationType = RegistrationType,
+                    VisaPan = MvisaPan,
+                    BirthDate = DOB.ToString(),
+                    IsPremier = IsPremier,
+                    IsInfinite = IsInfinite,
+                    Source = Source,
+                    IsPassport = IsPassport
+
+
+                };
+
+                return request;
+
+            }
+            catch (Exception ex)
+            {
+                reqlog.LogType = AlfaService.Configuration.cEnum.LogType.Error;
+                logstr.Add(" PrepareRegistrationRequest | Exception | " + ex.ToString());
+                return null;
+
+            }
+
+        }
+        private GetCategoryInformation GetCategoryInformation(string CategoryName)
+        {
+            GetCategoryInformation getCategoryInformation = new GetCategoryInformation();
+
+            List<string> lst = [CategoryName];
+            DataTable dt = cExecute.GetProcedureData("SP_CategoryInformationCore", CML.DataLayer.CEnum.ConnectTo.Ibanking, lst);
+            if (dt != null && dt.Rows.Count > 0)
+            {
+                getCategoryInformation.OwnAccount = dt.Rows[0]["OwnAccount"].ToString();
+                getCategoryInformation.PerTransactionOwnAccount = dt.Rows[0]["PerTransactionOwnAccount"].ToString();
+                getCategoryInformation.IsGroupOwnAccount = dt.Rows[0]["IsGroupOwnAccount"].ToString();
+                getCategoryInformation.ThirdPFT = dt.Rows[0]["ThirdPFT"].ToString();
+                getCategoryInformation.PerTransactionThirdPFT = dt.Rows[0]["PerTransactionThirdPFT"].ToString();
+                getCategoryInformation.IsGroupThirdPFT = dt.Rows[0]["IsGroupThirdPFT"].ToString();
+                getCategoryInformation.BillPayment = dt.Rows[0]["BillPayment"].ToString();
+                getCategoryInformation.PerTransactionBillPayment = dt.Rows[0]["PerTransactionBillPayment"].ToString();
+                getCategoryInformation.IsGroupBillPayment = dt.Rows[0]["IsGroupBillPayment"].ToString();
+                getCategoryInformation.Telecom = dt.Rows[0]["Telecom"].ToString();
+                getCategoryInformation.PerTransactionTelecom = dt.Rows[0]["PerTransactionTelecom"].ToString();
+                getCategoryInformation.IsGroupTelecom = dt.Rows[0]["IsGroupTelecom"].ToString();
+                getCategoryInformation.CreditCardOthers = dt.Rows[0]["CreditCardOthers"].ToString();
+                getCategoryInformation.PerTransactionCreditCardOthers = dt.Rows[0]["PerTransactionCreditCardOthers"].ToString();
+                getCategoryInformation.IsGroupCreditCardOthers = dt.Rows[0]["IsGroupCreditCardOthers"].ToString();
+                getCategoryInformation.IBFT = dt.Rows[0]["IBFT"].ToString();
+                getCategoryInformation.PerTransactionIBFT = dt.Rows[0]["PerTransactionIBFT"].ToString();
+                getCategoryInformation.IsGroupIBFT = dt.Rows[0]["IsGroupIBFT"].ToString();
+                getCategoryInformation.CreditCardOwn = dt.Rows[0]["CreditCardOwn"].ToString();
+                getCategoryInformation.PerTransactionCreditCardOwn = dt.Rows[0]["PerTransactionCreditCardOwn"].ToString();
+                getCategoryInformation.IsGroupCreditCardOwn = dt.Rows[0]["IsGroupCreditCardOwn"].ToString();
+                getCategoryInformation.GroupAmount = dt.Rows[0]["GroupAmount"].ToString();
+                getCategoryInformation.TotalTransactions = dt.Rows[0]["TotalTransactions"].ToString();
+                getCategoryInformation.AllowedDailyBillLimit = dt.Rows[0]["BillLimit"].ToString();
+                //getCategoryInformation.AllowedFT = dt.Rows[0]["AllowedFT"].ToString();
+                getCategoryInformation.Fees = dt.Rows[0]["Fees"].ToString();
+            }
+            return getCategoryInformation;
+        }
+
+
+        public bool UpdateNewCategory2(string LoginName, string CategoryName, string OwnAccount, string PerTransactionOwnAccount, string IsGroupOwnAccount, string ThirdPFT, string PerTransactionThirdPFT, string IsGroupThirdPFT,
+           string BillPayment, string PerTransactionBillPayment, string IsGroupBillPayment, string Telecom, string PerTransactionTelecom, string IsGroupTelecom, string CreditCardOthers, string PerTransactionCreditCardOthers,
+           string IsGroupCreditCardOthers, string IBFT, string PerTransactionIBFT, string IsGroupIBFT, string CreditCardOwn, string PerTransactionCreditCardOwn, string IsGroupCreditCardOwn, string GroupAmount, string TotalTransactions,
+           string AllowedDailyBillLimit)
+        {
+            List<string> lst = new List<string>();
+            lst.Add(LoginName);
+            lst.Add(CategoryName);
+            lst.Add(DateTime.Now.ToString());
+            lst.Add(OwnAccount);
+            lst.Add(PerTransactionOwnAccount);
+            lst.Add(IsGroupOwnAccount);
+            lst.Add(ThirdPFT);
+            lst.Add(PerTransactionThirdPFT);
+            lst.Add(IsGroupThirdPFT);
+            lst.Add(BillPayment);
+            lst.Add(PerTransactionBillPayment);
+            lst.Add(IsGroupBillPayment);
+            lst.Add(Telecom);
+            lst.Add(PerTransactionTelecom);
+            lst.Add(IsGroupTelecom);
+            lst.Add(CreditCardOthers);
+            lst.Add(PerTransactionCreditCardOthers);
+            lst.Add(IsGroupCreditCardOthers);
+            lst.Add(IBFT);
+            lst.Add(PerTransactionIBFT);
+            lst.Add(IsGroupIBFT);
+            lst.Add(CreditCardOwn);
+            lst.Add(PerTransactionCreditCardOwn);
+            lst.Add(IsGroupCreditCardOwn);
+            lst.Add(GroupAmount);
+            lst.Add(TotalTransactions);
+            lst.Add(AllowedDailyBillLimit);
+            return cExecute.CRUDProcedure("Sp_UpdateNewCategoryCore2", CML.DataLayer.CEnum.ConnectTo.Ibanking, lst);
+        }
+
+
+    }
+}
+
